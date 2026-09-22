@@ -1,6 +1,7 @@
 # 02 — User Flows & Interview State Model
 
 > Status: Draft for approval · Depends on: 01
+> **REVISED BY [10-architecture-review.md](10-architecture-review.md).** Where this document and doc 10 conflict, **doc 10 wins** — read doc 10 before implementing anything from this file.
 
 ## 1. Reasoning
 

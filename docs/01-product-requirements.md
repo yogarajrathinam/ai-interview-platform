@@ -1,6 +1,7 @@
 # 01 — Product Requirements (Phase 0)
 
 > Status: Draft for approval · Owner: Architecture · Last updated: 2026-09-10
+> **REVISED BY [10-architecture-review.md](10-architecture-review.md).** Where this document and doc 10 conflict, **doc 10 wins** — read doc 10 before implementing anything from this file.
 
 ## 1. Purpose of this document
 

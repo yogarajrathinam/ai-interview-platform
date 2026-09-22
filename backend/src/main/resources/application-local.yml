@@ -1,0 +1,14 @@
+# Local development defaults. Still no secrets: these are throwaway
+# credentials for a disposable local database only.
+spring:
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5433/interview_platform}
+    username: ${DATABASE_USERNAME:interview}
+    password: ${DATABASE_PASSWORD:interview}
+  jpa:
+    show-sql: true
+
+logging:
+  level:
+    com.aiinterview.interviewplatform: DEBUG
+    org.hibernate.SQL: DEBUG

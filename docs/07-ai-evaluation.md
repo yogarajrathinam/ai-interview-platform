@@ -1,6 +1,7 @@
 # 07 — AI Evaluation Design
 
 > Status: Draft for approval · Depends on: 01, 04, 06
+> **REVISED BY [10-architecture-review.md](10-architecture-review.md).** Where this document and doc 10 conflict, **doc 10 wins** — read doc 10 before implementing anything from this file.
 > This is the most important document in the package. It defines the product's core.
 
 ## 1. The philosophy, stated precisely

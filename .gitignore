@@ -1,0 +1,35 @@
+# Local toolchain bootstrapped by developers (JDK 21 / Maven). Never committed.
+.tools/
+
+# Build output
+target/
+build/
+*.jar
+*.war
+
+# Secrets — never commit. Use .env.example as the template.
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Node (frontend, later milestones)
+node_modules/
+dist/
