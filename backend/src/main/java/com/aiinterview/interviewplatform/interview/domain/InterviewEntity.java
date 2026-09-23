@@ -1,5 +1,7 @@
 package com.aiinterview.interviewplatform.interview.domain;
 
+import com.aiinterview.interviewplatform.interview.api.CompletionReason;
+import com.aiinterview.interviewplatform.interview.api.InterviewStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -30,13 +32,6 @@ import java.util.UUID;
 @Table(name = "interviews", schema = "app")
 public class InterviewEntity {
 
-    public enum Status { IN_PROGRESS, COMPLETING, COMPLETED, ABANDONED }
-
-    public enum CompletionReason {
-        CANDIDATE_FINISHED, ALL_ANSWERED, TIME_EXPIRED, AUTO_COMPLETED,
-        ABANDONED_BY_CANDIDATE, ABANDONED_EXPIRED, ABANDONED_BY_ADMIN
-    }
-
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
@@ -50,7 +45,7 @@ public class InterviewEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private Status status;
+    private InterviewStatus status;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "completion_reason")
@@ -93,10 +88,84 @@ public class InterviewEntity {
         // for JPA
     }
 
+    /**
+     * Starts an attempt. Creation and start are one operation — there is no
+     * state between them that anything could observe.
+     */
+    public static InterviewEntity start(UUID id, UUID candidateUserId, UUID templateId,
+                                        OffsetDateTime hardDeadlineAt, String engineVersion,
+                                        OffsetDateTime now) {
+        InterviewEntity entity = new InterviewEntity();
+        entity.id = id;
+        entity.candidateUserId = candidateUserId;
+        entity.templateId = templateId;
+        entity.status = InterviewStatus.IN_PROGRESS;
+        entity.hardDeadlineAt = hardDeadlineAt;
+        entity.lastActivityAt = now;
+        entity.engineVersion = engineVersion;
+        entity.createdAt = now;
+        entity.updatedAt = now;
+        return entity;
+    }
+
+    /** Keeps the idle sweeper honest about whether anyone is still here. */
+    public void touchActivity(OffsetDateTime now) {
+        this.lastActivityAt = now;
+    }
+
+    /**
+     * The candidate is done; grading and reporting are still settling.
+     *
+     * <p>The reason is recorded now, at the moment it is known, rather than
+     * held in memory until the attempt finally closes.
+     */
+    public void beginCompleting(CompletionReason reason, OffsetDateTime now) {
+        this.status = InterviewStatus.COMPLETING;
+        this.completionReason = reason;
+        this.completingAt = now;
+        this.lastActivityAt = now;
+    }
+
+    /**
+     * Closes the attempt.
+     *
+     * <p>{@code completedAt} is what {@code ck_int_terminal} keys on, so it is
+     * set here and only here.
+     */
+    public void finish(CompletionReason reason, OffsetDateTime now, UUID completedBy) {
+        this.status = reason.terminalStatus();
+        this.completionReason = reason;
+        this.completedAt = now;
+        this.completedBy = completedBy;
+        this.lastActivityAt = now;
+        if (this.completingAt == null && this.status == InterviewStatus.COMPLETED) {
+            this.completingAt = now;
+        }
+    }
+
+    /**
+     * Marks the deferred follow-up phase as having run.
+     *
+     * <p>Non-null means "the selector looked", which is what distinguishes
+     * choosing zero follow-ups from not having chosen yet — and is what makes
+     * advancing idempotent.
+     */
+    public void markFollowUpsSelected(OffsetDateTime now) {
+        this.followUpsSelectedAt = now;
+    }
+
+    public boolean hasSelectedFollowUps() {
+        return followUpsSelectedAt != null;
+    }
+
+    public boolean isExpiredAt(OffsetDateTime now) {
+        return now.isAfter(hardDeadlineAt);
+    }
+
     public UUID getId() { return id; }
     public UUID getCandidateUserId() { return candidateUserId; }
     public UUID getTemplateId() { return templateId; }
-    public Status getStatus() { return status; }
+    public InterviewStatus getStatus() { return status; }
     public CompletionReason getCompletionReason() { return completionReason; }
     public OffsetDateTime getHardDeadlineAt() { return hardDeadlineAt; }
     public OffsetDateTime getLastActivityAt() { return lastActivityAt; }

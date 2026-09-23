@@ -1,0 +1,35 @@
+{
+  "id": "java-hashmap-confidently-wrong",
+  "skill": "JAVA",
+  "notes": "Tests CONTRADICTED against MISSING, which is the distinction most graders collapse. The answer asserts the opposite of THREAD_SAFETY and of NULL_HANDLING, confidently and in complete sentences. Both must be CONTRADICTED, not MISSING: the candidate did address the point and got it wrong, which carries negative credit and quite different feedback. LOCK_GRANULARITY is genuinely never mentioned, so it is MISSING — the case therefore distinguishes the two in a single answer.",
+  "question": {
+    "promptText": "What is the difference between HashMap and ConcurrentHashMap, and when would you choose each?",
+    "referenceAnswer": "HashMap is not thread-safe; concurrent structural modification can corrupt it or cause an infinite loop during resize. ConcurrentHashMap is thread-safe and uses per-bin locking (CAS plus synchronized on the first node) rather than locking the whole map, so concurrent reads are lock-free. ConcurrentHashMap forbids null keys and values because null is ambiguous with 'absent' under concurrency. Use HashMap when the map is confined to one thread or externally synchronised; use ConcurrentHashMap for shared mutable state."
+  },
+  "criteria": [
+    {
+      "code": "THREAD_SAFETY",
+      "expectation": "States that HashMap is not thread-safe while ConcurrentHashMap is",
+      "weightBp": 4000,
+      "tier": "CORE"
+    },
+    {
+      "code": "LOCK_GRANULARITY",
+      "expectation": "Explains that ConcurrentHashMap locks per bin or segment rather than the whole map",
+      "weightBp": 3000,
+      "tier": "CORE"
+    },
+    {
+      "code": "NULL_HANDLING",
+      "expectation": "States that ConcurrentHashMap forbids null keys and values",
+      "weightBp": 3000,
+      "tier": "SUPPORTING"
+    }
+  ],
+  "answer": "Both of them are thread-safe, that's not really the difference. HashMap has been synchronized internally since Java 5, so you can share it between threads without any problem. The real difference is performance: ConcurrentHashMap is tuned for high throughput whereas HashMap is the general purpose one. They behave the same way about nulls as well, both HashMap and ConcurrentHashMap happily accept null keys and null values, so you don't need to worry about that when you switch between them.",
+  "expected": {
+    "THREAD_SAFETY": "CONTRADICTED",
+    "LOCK_GRANULARITY": "MISSING",
+    "NULL_HANDLING": "CONTRADICTED"
+  }
+}

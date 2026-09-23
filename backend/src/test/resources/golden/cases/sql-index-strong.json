@@ -1,0 +1,35 @@
+{
+  "id": "sql-index-strong",
+  "skill": "SQL",
+  "notes": "A strong answer in informal, ungrammatical prose. Deliberately scruffy: the rubric rewards content, and the prompt forbids grading style, so every criterion is MET. Catches a grader that penalises register.",
+  "question": {
+    "promptText": "A query filtering on a non-indexed column has become slow as the table grew. How would you diagnose and fix it?",
+    "referenceAnswer": "Start with EXPLAIN ANALYZE to see the actual plan and confirm a sequential scan rather than guessing. Add an index on the filtered column, choosing a composite index ordered to match the query's predicates when more than one column is involved. Understand the cost: every index slows writes and consumes space, so an index is a trade rather than a free win. Verify by re-running EXPLAIN ANALYZE and confirming the plan changed and the timing improved."
+  },
+  "criteria": [
+    {
+      "code": "MEASURE_FIRST",
+      "expectation": "Proposes inspecting the actual query plan (EXPLAIN/EXPLAIN ANALYZE) before changing anything",
+      "weightBp": 3500,
+      "tier": "CORE"
+    },
+    {
+      "code": "INDEX_CHOICE",
+      "expectation": "Proposes an index on the filtered column, with column order mattering for composite indexes",
+      "weightBp": 3500,
+      "tier": "CORE"
+    },
+    {
+      "code": "WRITE_COST",
+      "expectation": "Acknowledges that indexes impose a cost on writes or storage",
+      "weightBp": 3000,
+      "tier": "SUPPORTING"
+    }
+  ],
+  "answer": "first thing run explain analyze on it, dont guess. you want to see if its doing a seq scan on the whole table which is usually what it turns out to be. then yeah add an index on whatever column is in the where clause. if theres more than one column in the predicate then make it a composite index but be careful about the order of the columns, leftmost prefix, if you get the order wrong the planner wont use it. one thing to keep in mind is you cant just add indexes to everything, every index you add has to be maintained on insert and update so writes get slower and it takes disk. then rerun explain analyze after to check it actually picked up the index",
+  "expected": {
+    "MEASURE_FIRST": "MET",
+    "INDEX_CHOICE": "MET",
+    "WRITE_COST": "MET"
+  }
+}

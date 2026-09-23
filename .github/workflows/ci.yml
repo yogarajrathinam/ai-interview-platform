@@ -1,0 +1,221 @@
+name: CI
+
+# Every push and every pull request. The build is the whole gate:
+# `mvn clean verify` runs the architecture suite, migrates an empty
+# PostgreSQL with Flyway, validates the Hibernate mapping against it, and
+# proves each database invariant. Nothing here may weaken that.
+on:
+  push:
+  pull_request:
+
+# Superseded runs on the same ref are cancelled; the newest commit is the
+# one whose result matters.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  JAVA_VERSION: "21"
+  # Must match TestDatabase.IMAGE. Asserted at runtime in the build job.
+  POSTGRES_IMAGE: "postgres:16-alpine"
+  GITLEAKS_VERSION: "v8.21.2"
+
+jobs:
+  # ---------------------------------------------------------------------
+  # Runs in parallel with the build: a leaked credential is worth knowing
+  # about even when the tests are failing for unrelated reasons.
+  # ---------------------------------------------------------------------
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out full history
+        uses: actions/checkout@v4
+        with:
+          # gitleaks scans commits, not just the worktree: a secret that was
+          # committed and later removed is still a leaked secret.
+          fetch-depth: 0
+
+      - name: Run gitleaks
+        # The official image, pinned. Deliberately not gitleaks-action, which
+        # requires a paid GITLEAKS_LICENSE for organisation-owned repositories.
+        # --redact keeps any finding out of the build log, which is readable by
+        # anyone who can see the run.
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}:/repo:ro" \
+            "ghcr.io/gitleaks/gitleaks:${{ env.GITLEAKS_VERSION }}" \
+            detect \
+              --source=/repo \
+              --redact \
+              --no-banner \
+              --verbose \
+              --exit-code 1
+
+  # ---------------------------------------------------------------------
+  build:
+    name: Build and verify (Java 21)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Assert toolchain
+        run: |
+          set -euo pipefail
+          echo "--- java ---"; java -version
+          echo "--- maven ---"; mvn -version
+
+          # setup-java is authoritative, but an accidental change to the matrix
+          # or a cached toolchain should fail loudly rather than build on 17.
+          actual="$(java -version 2>&1 | head -1 | sed -E 's/.*"([0-9]+).*/\1/')"
+          if [ "$actual" != "${{ env.JAVA_VERSION }}" ]; then
+            echo "::error::Expected Java ${{ env.JAVA_VERSION }}, got $actual"
+            exit 1
+          fi
+
+      # The test suite falls back to an external database when
+      # TEST_DATABASE_URL is set (see TestDatabase). That escape hatch exists
+      # for workstations without a container runtime; in CI it would silently
+      # bypass the pinned image, so its absence is asserted rather than assumed.
+      - name: Assert Testcontainers path is in force
+        run: |
+          set -euo pipefail
+          if [ -n "${TEST_DATABASE_URL:-}" ]; then
+            echo "::error::TEST_DATABASE_URL is set. CI must use Testcontainers so the"
+            echo "::error::database tests run against ${{ env.POSTGRES_IMAGE }}."
+            exit 1
+          fi
+          docker info > /dev/null
+          echo "Docker available; Testcontainers will start ${{ env.POSTGRES_IMAGE }}."
+
+      # No profile, no -D overrides, no -DskipTests: the default profile runs
+      # ArchitectureTest, MigrationAndMappingTest and DatabaseInvariantTest.
+      # Flyway migrates the fresh container from empty and Hibernate's
+      # ddl-auto=validate then checks all 18 entity mappings against it.
+      - name: mvn clean verify
+        run: |
+          set -euo pipefail
+          set -o pipefail
+          mvn -B -ntp clean verify 2>&1 | tee build.log
+
+      - name: Assert Testcontainers used the pinned PostgreSQL image
+        run: |
+          set -euo pipefail
+          if ! grep -qi "${{ env.POSTGRES_IMAGE }}" build.log; then
+            echo "::error::No container for ${{ env.POSTGRES_IMAGE }} appears in the build log."
+            echo "::error::Either the pinned image changed in TestDatabase, or the database"
+            echo "::error::tests did not actually run."
+            exit 1
+          fi
+          grep -i -m3 "${{ env.POSTGRES_IMAGE }}" build.log
+
+      # Guards against the quietest possible regression: a suite that stops
+      # running at all still produces a green `mvn verify`.
+      - name: Assert the required suites ran and were not skipped
+        run: |
+          set -euo pipefail
+          # Every suite that must never stop running silently. M2 added the
+          # evaluation suites after two of them were briefly invisible: named
+          # *IT, they matched neither surefire's includes nor a failsafe
+          # execution, so `mvn verify` stayed green while they ran zero tests.
+          required="ArchitectureTest
+                    MigrationAndMappingTest
+                    DatabaseInvariantTest
+                    ScoringTest
+                    EvaluationPhaseTest
+                    EvidenceValidatorTest
+                    EvaluationEngineTest
+                    AnswerEvaluationIntegrationTest
+                    EvaluationFailureIntegrationTest
+                    InterviewLifecycleTest
+                    QuestionSelectorTest
+                    InterviewEngineIntegrationTest
+                    JobWorkerIntegrationTest
+                    CatalogueAuthoringIntegrationTest
+                    AnthropicProviderAdapterTest
+                    GoldenSetStructureTest
+                    AgreementMetricTest"
+          reports=target/surefire-reports
+
+          for suite in $required; do
+            # Wildcards on both sides so a @Nested suite is counted too: JUnit
+            # writes the outer class with tests=0 and each nested class to its
+            # own TEST-...Outer$Inner.xml.
+            files=$(ls "$reports"/TEST-*"$suite"*.xml 2>/dev/null || true)
+            if [ -z "$files" ]; then
+              echo "::error::$suite produced no surefire report — it did not run."
+              exit 1
+            fi
+
+            tests=0; failures=0; errors=0; skipped=0
+            for file in $files; do
+              # Flattened first: surefire may wrap the attribute list across lines.
+              attrs="$(tr -d '\n' < "$file" | grep -o '<testsuite[^>]*>' | head -1)"
+              value() { echo "$attrs" | grep -o "$1=\"[0-9]*\"" | grep -o '[0-9]*' | head -1; }
+              tests=$((tests + $(value tests)))
+              failures=$((failures + $(value failures)))
+              errors=$((errors + $(value errors)))
+              skipped=$((skipped + $(value skipped)))
+            done
+
+            echo "$suite: tests=$tests failures=$failures errors=$errors skipped=$skipped"
+
+            if [ "$tests" -eq 0 ]; then
+              echo "::error::$suite contains no tests."; exit 1
+            fi
+            if [ "$failures" -ne 0 ] || [ "$errors" -ne 0 ]; then
+              echo "::error::$suite has failures or errors."; exit 1
+            fi
+            if [ "$skipped" -ne 0 ]; then
+              echo "::error::$suite has skipped tests. These suites must never be skipped."
+              exit 1
+            fi
+          done
+          echo "All required suites ran clean."
+
+      # The inverse guard. The list above catches a suite that stops running;
+      # this catches one that starts. The live gate calls a paid API and is
+      # non-deterministic, so CI running it would spend money on every push and
+      # go red on someone else's rate limit until people learned to ignore red.
+      - name: Assert the live AI suite did not run
+        run: |
+          set -euo pipefail
+          if ls target/surefire-reports/TEST-*GoldenSetLiveEvaluationTest*.xml >/dev/null 2>&1; then
+            echo "::error::GoldenSetLiveEvaluationTest ran in CI. It is tagged"
+            echo "::error::live-ai and must stay opt-in — CI must never depend on"
+            echo "::error::a paid, non-deterministic external service."
+            exit 1
+          fi
+          echo "Live AI suite correctly excluded."
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: backend/target/surefire-reports/
+          retention-days: 7
+          if-no-files-found: warn
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: backend/build.log
+          retention-days: 7
+          if-no-files-found: ignore

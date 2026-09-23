@@ -4,7 +4,7 @@
 > content and scope reflect the approved review
 > ([10-architecture-review.md](10-architecture-review.md)).
 >
-> Last updated: M0 + M1 complete.
+> Last updated: M5A complete (HTTP API and candidate UI vertical slice).
 
 ## Sequencing principles
 
@@ -26,9 +26,11 @@ that matters.
 |---|---|---|
 | **M0** | Repository, module skeleton, cross-cutting foundation, ArchUnit, CI-ready build | ✅ **Done** |
 | **M1** | Flyway baseline, 18 tables, triggers, JPA mapping, invariant tests | ✅ **Done** |
-| **M2** | AI gateway + evaluation engine, headless, golden set v0 | Next — **risk-reduction milestone** |
-| **M3** | Catalogue: question bank and templates, publish services, dry-run tool | |
-| **M4** | Interview engine, job worker, deferred follow-ups | |
+| **M2** | Headless evaluation engine, deterministic provider, backend-owned scoring | ✅ **Done** — see [m2-evaluation-engine.md](m2-evaluation-engine.md) |
+| **M3** | Interview & question engine: lifecycle, sequencing, selection, follow-up graph | ✅ **Done** — see [m3-interview-engine.md](m3-interview-engine.md) |
+| **M4** | Job worker, operations, catalogue authoring | ✅ **Done** — see [m4-worker-operations-catalogue.md](m4-worker-operations-catalogue.md) |
+| **M4.5** | Real AI evaluation provider, versioned prompt, golden set and agreement gate | ✅ **Done** — see [m5-ai-provider-golden-set.md](m5-ai-provider-golden-set.md) |
+| **M5A** | HTTP API and candidate UI vertical slice (no auth) | ✅ **Done** — see [m5a-http-api-candidate-ui.md](m5a-http-api-candidate-ui.md) |
 | **M5** | Reporting: aggregation, bands, coverage | |
 | **M6** | Auth end to end: JWKS verification, JIT provisioning, ownership checks | |
 | **M7** | Design system and app shell | |
@@ -38,9 +40,31 @@ that matters.
 
 Critical path: M1 → M2 → M4 → M5 → M8.
 
-## M2 — Evaluation engine, headless *(next, ≈4 days)*
+> **A numbering note.** The working brief for the AI provider called it "M5",
+> but this plan's M5 has always been Reporting. It is recorded above as **M4.5**
+> so that M5–M10 keep the numbers everything else already refers to — the
+> document it delivers is still named `m5-…` because that is what the brief
+> called it. Renumbering the roadmap is a call for the product owner, not a
+> side effect of a build; say the word and M5–M10 shift down by one.
 
-The risk-reduction milestone, and the reason it comes before any UI.
+## M2 — Evaluation engine, headless ✅ *(done)*
+
+Delivered as the headless engine with a **deterministic provider**: the whole
+pipeline — contract, validation gates, evidence location, backend-owned scoring,
+lifecycle, idempotency, accounting, reproducibility — proven end to end without
+a model. See [m2-evaluation-engine.md](m2-evaluation-engine.md).
+
+**Split out of M2, not dropped.** The real provider and the golden set move to a
+dedicated AI-integration milestone. The reasoning: those two items are the
+*quality* bet, while everything else in M2 is the *plumbing* the quality bet
+runs on. Proving the plumbing first means any disagreement measured later is
+attributable to the prompt or the model, not to a scoring bug — and it removes
+the provider account and budget from the critical path of everything downstream.
+The stop-gate below moves with them and still governs.
+
+The milestone ordering is otherwise unchanged.
+
+### What the original plan scoped here, for reference
 
 - `ai` module: `AiClient` port, `AiGateway` (timeout, bounded retry, budget cap,
   `ai_invocations` accounting), one real provider adapter + `MockAdapter`.
@@ -61,20 +85,48 @@ evidence, derived score — and show a hallucinated-evidence case being downgrad
 **Stop-gate:** if criterion agreement is below ~70%, stop and fix the approach
 before building anything on top of it. A pivot here costs days, not weeks.
 
-## M3 — Catalogue *(≈3 days)*
+## M3 — Interview & question engine ✅ *(done)*
 
-Question and template authoring services, publish validation in the application
-layer *above* the database gates, plan resolution, `dry-run-evaluation`, and the
-seed command that loads content through the same validation path.
+Delivered per the approved sequencing decision: attempt lifecycle, question
+sequencing and selection, turn orchestration, and the deferred follow-up graph.
+See [m3-interview-engine.md](m3-interview-engine.md).
 
-## M4 — Interview engine and job worker *(≈4 days)*
+**No schema change was needed.** The M1 baseline already carried every state,
+constraint and column the engine required — including
+`follow_ups_selected_at`, which existed for exactly this purpose.
 
-Attempt lifecycle, turn materialisation, idempotent answer submission,
-`advance`, `complete`, the maintenance sweeper, and the DB-backed worker.
-`FollowUpSelector` as a **pure function** with table-driven tests.
+**Catalogue authoring moved to M4.** This slot originally held question and
+template *authoring* services. M3 needed the catalogue only for *reading*
+published content, which the extended `QuestionCatalog` and the new
+`TemplateCatalog` now provide. Authoring is admin functionality with no consumer
+until an admin surface exists, so building it now would have been speculative.
 
-**Demo:** drive a whole interview over HTTP, including a deferred follow-up, a
-duplicate submit, and a provider outage that leaves the interview usable.
+## M4 — Job worker, operations and catalogue authoring *(≈4 days)*
+
+The DB-backed job worker that drives grading off the request thread, the expiry
+and idle sweeper, and the authoring services deferred from M3 (publish flows
+above the database gates, the seed command, `dry-run-evaluation`).
+
+**Demo:** drive a whole interview end to end with grading running
+asynchronously, including a duplicate submit and a provider outage that leaves
+the interview usable.
+
+## M4.5 — Real AI provider and golden set ✅ *(done)*
+
+The deterministic provider from M2 is replaced, behind the unchanged
+`EvaluationProvider` port, by a real model returning schema-constrained verdicts.
+Nothing in `evaluation.api`, `evaluation.domain` or `evaluation.application`
+changed, which was the test of whether the M2 port was genuine.
+
+Added with it: a versioned prompt (`answer-evaluation-v1`), a hand-labelled
+golden set, and a criterion-level agreement gate defaulting to 0.70. The gate is
+opt-in and excluded from CI — it calls a paid, non-deterministic service, and a
+build that goes red on model variance teaches people to ignore red. **CI proves
+the pipeline and the metric; the live gate proves the grader.**
+
+M10 still owns growing the set to 40 cases.
+
+See [m5-ai-provider-golden-set.md](m5-ai-provider-golden-set.md).
 
 ## M5 — Reporting *(≈2 days)*
 

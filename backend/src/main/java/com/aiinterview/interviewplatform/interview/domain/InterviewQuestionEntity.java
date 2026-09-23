@@ -1,5 +1,7 @@
 package com.aiinterview.interviewplatform.interview.domain;
 
+import com.aiinterview.interviewplatform.interview.api.TurnKind;
+import com.aiinterview.interviewplatform.interview.api.TurnStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -30,10 +32,6 @@ import java.util.UUID;
 @Table(name = "interview_questions", schema = "app")
 public class InterviewQuestionEntity {
 
-    public enum Kind { CORE, FOLLOW_UP }
-
-    public enum Status { PENDING, ASKED, ANSWERED, SKIPPED, EVALUATED, EVAL_FAILED }
-
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
@@ -46,7 +44,7 @@ public class InterviewQuestionEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "kind", nullable = false, updatable = false)
-    private Kind kind;
+    private TurnKind kind;
 
     /** The core turn a follow-up probes; null for core turns. */
     @Column(name = "parent_id", updatable = false)
@@ -73,7 +71,7 @@ public class InterviewQuestionEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private Status status;
+    private TurnStatus status;
 
     @Column(name = "asked_at")
     private OffsetDateTime askedAt;
@@ -91,17 +89,109 @@ public class InterviewQuestionEntity {
         // for JPA
     }
 
+    /**
+     * A planned turn, resolved from a template slot at interview start.
+     *
+     * <p>{@code skillId} and {@code weightBp} are copied in rather than joined
+     * later: the score must stay recomputable from attempt-scoped rows alone,
+     * so archiving a question cannot alter a past result.
+     */
+    public static InterviewQuestionEntity core(UUID id, UUID interviewId, int position,
+                                               UUID questionVersionId, UUID skillId,
+                                               int weightBp, OffsetDateTime now) {
+        InterviewQuestionEntity entity = new InterviewQuestionEntity();
+        entity.id = id;
+        entity.interviewId = interviewId;
+        entity.position = position;
+        entity.kind = TurnKind.CORE;
+        entity.questionVersionId = questionVersionId;
+        entity.skillId = skillId;
+        entity.weightBp = weightBp;
+        entity.status = TurnStatus.PENDING;
+        entity.createdAt = now;
+        entity.updatedAt = now;
+        return entity;
+    }
+
+    /**
+     * A probe into a criterion an earlier answer covered weakly.
+     *
+     * <p>Weight is zero by construction — {@code ck_iq_shape} would reject
+     * anything else — so a follow-up moves no average. It carries its own
+     * prompt text because the curated probe is not the parent question.
+     */
+    public static InterviewQuestionEntity followUp(UUID id, UUID interviewId, int position,
+                                                   UUID parentId, UUID questionVersionId,
+                                                   UUID skillId, UUID followUpCriterionId,
+                                                   String promptText, OffsetDateTime now) {
+        InterviewQuestionEntity entity = new InterviewQuestionEntity();
+        entity.id = id;
+        entity.interviewId = interviewId;
+        entity.position = position;
+        entity.kind = TurnKind.FOLLOW_UP;
+        entity.parentId = parentId;
+        entity.questionVersionId = questionVersionId;
+        entity.skillId = skillId;
+        entity.weightBp = 0;
+        entity.followUpCriterionId = followUpCriterionId;
+        entity.promptText = promptText;
+        entity.status = TurnStatus.PENDING;
+        entity.createdAt = now;
+        entity.updatedAt = now;
+        return entity;
+    }
+
+    /**
+     * Serves the turn. Idempotent: re-serving keeps the original
+     * {@code asked_at}, so a refreshed browser does not reset the clock.
+     */
+    public void markAsked(OffsetDateTime now) {
+        if (status == TurnStatus.PENDING) {
+            this.status = TurnStatus.ASKED;
+        }
+        if (this.askedAt == null) {
+            this.askedAt = now;
+        }
+    }
+
+    /** {@code ck_iq_asked} requires an ask time on any non-pending turn. */
+    public void markAnswered(Integer timeSpentSec, OffsetDateTime now) {
+        markAsked(now);
+        this.status = TurnStatus.ANSWERED;
+        if (timeSpentSec != null && timeSpentSec >= 0) {
+            this.timeSpentSec = timeSpentSec;
+        }
+    }
+
+    public void markSkipped(OffsetDateTime now) {
+        markAsked(now);
+        this.status = TurnStatus.SKIPPED;
+    }
+
+    /** Applied by the orchestrator once grading settles; never by evaluation. */
+    public void markEvaluated() {
+        this.status = TurnStatus.EVALUATED;
+    }
+
+    public void markEvalFailed() {
+        this.status = TurnStatus.EVAL_FAILED;
+    }
+
+    public boolean isFollowUp() {
+        return kind == TurnKind.FOLLOW_UP;
+    }
+
     public UUID getId() { return id; }
     public UUID getInterviewId() { return interviewId; }
     public Integer getPosition() { return position; }
-    public Kind getKind() { return kind; }
+    public TurnKind getKind() { return kind; }
     public UUID getParentId() { return parentId; }
     public UUID getQuestionVersionId() { return questionVersionId; }
     public UUID getSkillId() { return skillId; }
     public Integer getWeightBp() { return weightBp; }
     public UUID getFollowUpCriterionId() { return followUpCriterionId; }
     public String getPromptText() { return promptText; }
-    public Status getStatus() { return status; }
+    public TurnStatus getStatus() { return status; }
     public OffsetDateTime getAskedAt() { return askedAt; }
     public Integer getTimeSpentSec() { return timeSpentSec; }
     public OffsetDateTime getCreatedAt() { return createdAt; }

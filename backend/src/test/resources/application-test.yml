@@ -13,6 +13,16 @@ spring:
 app:
   environment: test
   engine-version: test
+  jobs:
+    # The scheduled worker is off in tests. Tests drive JobWorker.pollOnce()
+    # directly and assert on what it returns, which is deterministic; a
+    # background poller would race those assertions and silently claim the very
+    # jobs a test is about to inspect.
+    worker-enabled: false
+    # Short enough that a lease-expiry test need not sleep.
+    lease-seconds: 30
+    initial-backoff-seconds: 1
+    max-backoff-seconds: 8
 
 logging:
   level:

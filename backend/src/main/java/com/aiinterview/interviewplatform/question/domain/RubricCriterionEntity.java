@@ -69,6 +69,31 @@ public class RubricCriterionEntity {
         // for JPA
     }
 
+    /**
+     * A criterion on a draft version.
+     *
+     * <p>Writable only while the parent version is DRAFT. {@code trg_rc_20_guard}
+     * enforces that regardless; the authoring service checks first so an author
+     * gets an explanation instead of a constraint violation.
+     */
+    public static RubricCriterionEntity create(UUID id, UUID questionVersionId, String code,
+                                               String label, String expectation, int weightBp,
+                                               Tier tier, String followUpPrompt,
+                                               short sortOrder, OffsetDateTime now) {
+        RubricCriterionEntity entity = new RubricCriterionEntity();
+        entity.id = id;
+        entity.questionVersionId = questionVersionId;
+        entity.code = code;
+        entity.label = label;
+        entity.expectation = expectation;
+        entity.weightBp = weightBp;
+        entity.tier = tier == null ? Tier.CORE : tier;
+        entity.followUpPrompt = followUpPrompt;
+        entity.sortOrder = sortOrder;
+        entity.createdAt = now;
+        return entity;
+    }
+
     public UUID getId() { return id; }
     public UUID getQuestionVersionId() { return questionVersionId; }
     public String getCode() { return code; }

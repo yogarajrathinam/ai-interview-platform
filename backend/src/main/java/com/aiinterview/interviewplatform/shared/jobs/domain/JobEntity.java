@@ -1,5 +1,7 @@
 package com.aiinterview.interviewplatform.shared.jobs.domain;
 
+import com.aiinterview.interviewplatform.shared.jobs.api.JobStatus;
+import com.aiinterview.interviewplatform.shared.jobs.api.JobType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -38,15 +40,6 @@ import org.hibernate.type.SqlTypes;
 @Table(name = "jobs", schema = "app")
 public class JobEntity {
 
-    /**
-     * Follow-up selection is deliberately absent: it is pure computation over
-     * rows already stored, and making it a job would add latency at the one
-     * point where the candidate is actually waiting.
-     */
-    public enum JobType { EVALUATE_ANSWER, GENERATE_REPORT, MAINTENANCE }
-
-    public enum Status { QUEUED, RUNNING, SUCCEEDED, FAILED, DEAD }
-
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
@@ -65,7 +58,7 @@ public class JobEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
-    private Status status;
+    private JobStatus status;
 
     @Column(name = "priority", nullable = false)
     private Short priority;
@@ -100,11 +93,99 @@ public class JobEntity {
         // for JPA
     }
 
+    /** Enqueues work, available immediately unless a delay is given. */
+    public static JobEntity enqueue(UUID id, JobType jobType, String dedupeKey, String payload,
+                                    short priority, short maxAttempts,
+                                    OffsetDateTime runAfter, OffsetDateTime now) {
+        JobEntity entity = new JobEntity();
+        entity.id = id;
+        entity.jobType = jobType;
+        entity.dedupeKey = dedupeKey;
+        entity.payload = payload;
+        entity.status = JobStatus.QUEUED;
+        entity.priority = priority;
+        entity.attempts = 0;
+        entity.maxAttempts = maxAttempts;
+        entity.runAfter = runAfter == null ? now : runAfter;
+        entity.createdAt = now;
+        entity.updatedAt = now;
+        return entity;
+    }
+
+    /**
+     * Takes ownership of this job.
+     *
+     * <p>Only ever called on a row already locked by {@code FOR UPDATE SKIP
+     * LOCKED}, which is what makes the claim atomic — this method records the
+     * claim, it does not arbitrate it.
+     *
+     * <p>The attempt is counted here rather than at completion, so a worker
+     * that dies mid-handler has still used one. Otherwise a job that reliably
+     * crashes its worker would be retried for ever.
+     */
+    public void claim(String workerId, OffsetDateTime now) {
+        this.status = JobStatus.RUNNING;
+        this.lockedBy = workerId;
+        this.lockedAt = now;
+        this.attempts = (short) (this.attempts + 1);
+        this.updatedAt = now;
+    }
+
+    public void markSucceeded(OffsetDateTime now) {
+        this.status = JobStatus.SUCCEEDED;
+        // Released so ck_jobs_lock holds: only a RUNNING row may name an owner.
+        this.lockedBy = null;
+        this.lockedAt = null;
+        this.lastError = null;
+        this.updatedAt = now;
+    }
+
+    /**
+     * Schedules another attempt.
+     *
+     * <p>Returns to {@code QUEUED} rather than staying {@code FAILED}: the
+     * claim query looks only at queued rows, so a job parked in any other state
+     * would never be retried. {@code FAILED} exists as the transient state a
+     * handler reports, not as somewhere work rests.
+     */
+    public void scheduleRetry(OffsetDateTime nextAttemptAt, String error, OffsetDateTime now) {
+        this.status = JobStatus.QUEUED;
+        this.lockedBy = null;
+        this.lockedAt = null;
+        this.runAfter = nextAttemptAt;
+        this.lastError = error;
+        this.updatedAt = now;
+    }
+
+    /**
+     * Gives up permanently.
+     *
+     * <p>The row is kept, never deleted: a dead job is the record that work was
+     * asked for and never done, which is precisely what an operator needs.
+     */
+    public void markDead(String error, OffsetDateTime now) {
+        this.status = JobStatus.DEAD;
+        this.lockedBy = null;
+        this.lockedAt = null;
+        this.lastError = error;
+        this.updatedAt = now;
+    }
+
+    /** True once this attempt would exceed the configured ceiling. */
+    public boolean hasExhaustedAttempts() {
+        return attempts >= maxAttempts;
+    }
+
+    /** A claim is stale when its owner has been silent past the lease. */
+    public boolean isLeaseExpired(OffsetDateTime cutoff) {
+        return status == JobStatus.RUNNING && lockedAt != null && lockedAt.isBefore(cutoff);
+    }
+
     public UUID getId() { return id; }
     public JobType getJobType() { return jobType; }
     public String getDedupeKey() { return dedupeKey; }
     public String getPayload() { return payload; }
-    public Status getStatus() { return status; }
+    public JobStatus getStatus() { return status; }
     public Short getPriority() { return priority; }
     public Short getAttempts() { return attempts; }
     public Short getMaxAttempts() { return maxAttempts; }

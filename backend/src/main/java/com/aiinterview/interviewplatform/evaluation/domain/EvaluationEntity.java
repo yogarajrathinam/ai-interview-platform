@@ -1,5 +1,6 @@
 package com.aiinterview.interviewplatform.evaluation.domain;
 
+import com.aiinterview.interviewplatform.evaluation.api.EvaluationStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -36,8 +37,6 @@ import java.util.UUID;
 @Table(name = "evaluations", schema = "app")
 public class EvaluationEntity {
 
-    public enum Status { SUCCEEDED, FAILED_VALIDATION, FAILED_PROVIDER }
-
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
@@ -51,7 +50,7 @@ public class EvaluationEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, updatable = false)
-    private Status status;
+    private EvaluationStatus status;
 
     /** Computed by the backend. Null only when the evaluation failed. */
     @Column(name = "derived_score", updatable = false)
@@ -125,10 +124,94 @@ public class EvaluationEntity {
         // for JPA
     }
 
+    /**
+     * Starts a new evaluation row. Always current on insert — superseding the
+     * previous one is a separate, explicit step so the append-only trigger can
+     * see exactly one column change.
+     */
+    public static Builder builder(UUID id, UUID answerId, EvaluationStatus status) {
+        return new Builder(id, answerId, status);
+    }
+
+    /** Too many provenance fields for readable positional construction. */
+    public static final class Builder {
+        private final EvaluationEntity entity = new EvaluationEntity();
+
+        private Builder(UUID id, UUID answerId, EvaluationStatus status) {
+            entity.id = id;
+            entity.answerId = answerId;
+            entity.status = status;
+            entity.current = true;
+        }
+
+        public Builder score(BigDecimal derived, BigDecimal modelReported, BigDecimal confidence) {
+            entity.derivedScore = derived;
+            entity.modelReportedScore = modelReported;
+            entity.confidence = confidence;
+            return this;
+        }
+
+        public Builder summary(String value) {
+            entity.summary = value;
+            return this;
+        }
+
+        public Builder followUp(boolean needed, String reason, UUID targetCriterionId) {
+            entity.followUpNeeded = needed;
+            entity.followUpReason = reason;
+            entity.followUpTargetCriterionId = targetCriterionId;
+            return this;
+        }
+
+        public Builder flags(boolean injectionSuspected, boolean answerOffTopic) {
+            entity.injectionSuspected = injectionSuspected;
+            entity.answerOffTopic = answerOffTopic;
+            return this;
+        }
+
+        /** The quartet that makes a historical score explainable. */
+        public Builder provenance(String evaluationVersion, String promptVersion,
+                                  int rubricVersion, UUID questionVersionId) {
+            entity.evaluationVersion = evaluationVersion;
+            entity.promptVersion = promptVersion;
+            entity.rubricVersion = rubricVersion;
+            entity.questionVersionId = questionVersionId;
+            return this;
+        }
+
+        public Builder provider(String provider, String model, UUID aiInvocationId) {
+            entity.provider = provider;
+            entity.model = model;
+            entity.aiInvocationId = aiInvocationId;
+            return this;
+        }
+
+        /** Null for an automatic run; the admin's id for a re-evaluation. */
+        public Builder triggeredBy(UUID userId) {
+            entity.triggeredBy = userId;
+            return this;
+        }
+
+        public Builder error(String code, String detail) {
+            entity.errorCode = code;
+            entity.errorDetail = detail;
+            return this;
+        }
+
+        public Builder createdAt(OffsetDateTime value) {
+            entity.createdAt = value;
+            return this;
+        }
+
+        public EvaluationEntity build() {
+            return entity;
+        }
+    }
+
     public UUID getId() { return id; }
     public UUID getAnswerId() { return answerId; }
     public boolean isCurrent() { return current; }
-    public Status getStatus() { return status; }
+    public EvaluationStatus getStatus() { return status; }
     public BigDecimal getDerivedScore() { return derivedScore; }
     public BigDecimal getModelReportedScore() { return modelReportedScore; }
     public BigDecimal getConfidence() { return confidence; }

@@ -1,0 +1,35 @@
+{
+  "id": "java-hashmap-hedged",
+  "skill": "JAVA",
+  "notes": "The hardest kind of case, and the reason the set exists. Same rubric as java-hashmap-strong, but the answer gestures at each point without committing. THREAD_SAFETY is asserted plainly so it is MET; LOCK_GRANULARITY is hedged to the point of being only half-right ('locks smaller parts' with no mechanism) so it is PARTIAL; NULL_HANDLING is never raised at all. A grader that rewards fluency over content will mark all three MET.",
+  "question": {
+    "promptText": "What is the difference between HashMap and ConcurrentHashMap, and when would you choose each?",
+    "referenceAnswer": "HashMap is not thread-safe; concurrent structural modification can corrupt it or cause an infinite loop during resize. ConcurrentHashMap is thread-safe and uses per-bin locking (CAS plus synchronized on the first node) rather than locking the whole map, so concurrent reads are lock-free. ConcurrentHashMap forbids null keys and values because null is ambiguous with 'absent' under concurrency. Use HashMap when the map is confined to one thread or externally synchronised; use ConcurrentHashMap for shared mutable state."
+  },
+  "criteria": [
+    {
+      "code": "THREAD_SAFETY",
+      "expectation": "States that HashMap is not thread-safe while ConcurrentHashMap is",
+      "weightBp": 4000,
+      "tier": "CORE"
+    },
+    {
+      "code": "LOCK_GRANULARITY",
+      "expectation": "Explains that ConcurrentHashMap locks per bin or segment rather than the whole map",
+      "weightBp": 3000,
+      "tier": "CORE"
+    },
+    {
+      "code": "NULL_HANDLING",
+      "expectation": "States that ConcurrentHashMap forbids null keys and values",
+      "weightBp": 3000,
+      "tier": "SUPPORTING"
+    }
+  ],
+  "answer": "So the main thing is that HashMap isn't thread-safe and ConcurrentHashMap is, that's really the headline difference. ConcurrentHashMap is also a lot better under contention because rather than locking everything it locks smaller parts of the structure, which obviously helps throughput when you have a lot of threads hitting it. In general I'd reach for ConcurrentHashMap in any multi-threaded service and keep HashMap for local stuff inside a method where nothing else can see it.",
+  "expected": {
+    "THREAD_SAFETY": "MET",
+    "LOCK_GRANULARITY": "PARTIAL",
+    "NULL_HANDLING": "MISSING"
+  }
+}

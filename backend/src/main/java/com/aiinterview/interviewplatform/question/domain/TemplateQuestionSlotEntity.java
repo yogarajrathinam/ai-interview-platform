@@ -57,6 +57,45 @@ public class TemplateQuestionSlotEntity {
         // for JPA
     }
 
+    /** A slot filled from a skill pool at interview start. */
+    public static TemplateQuestionSlotEntity pooled(UUID id, UUID templateId, short position,
+                                                    UUID skillId,
+                                                    QuestionVersionEntity.Difficulty difficulty,
+                                                    QuestionVersionEntity.QuestionType type,
+                                                    int weightBp) {
+        TemplateQuestionSlotEntity entity = new TemplateQuestionSlotEntity();
+        entity.id = id;
+        entity.templateId = templateId;
+        entity.position = position;
+        entity.skillId = skillId;
+        entity.difficulty = difficulty;
+        entity.questionType = type;
+        entity.weightBp = weightBp;
+        return entity;
+    }
+
+    /** A slot naming one exact question family. */
+    public static TemplateQuestionSlotEntity pinned(UUID id, UUID templateId, short position,
+                                                    UUID questionId, int weightBp) {
+        TemplateQuestionSlotEntity entity = new TemplateQuestionSlotEntity();
+        entity.id = id;
+        entity.templateId = templateId;
+        entity.position = position;
+        entity.questionId = questionId;
+        entity.weightBp = weightBp;
+        return entity;
+    }
+
+    /**
+     * Moves the slot.
+     *
+     * <p>Reordering has to renumber in one pass: {@code uq_tqs_position} would
+     * reject an intermediate state where two slots briefly share a position.
+     */
+    public void moveTo(short position) {
+        this.position = position;
+    }
+
     public UUID getId() { return id; }
     public UUID getTemplateId() { return templateId; }
     public Short getPosition() { return position; }

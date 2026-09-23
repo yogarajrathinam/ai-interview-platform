@@ -101,6 +101,93 @@ public class InterviewTemplateEntity {
         // for JPA
     }
 
+    /** A new editable template version. */
+    public static InterviewTemplateEntity draft(UUID id, String templateKey, int version,
+                                                String title, String summary, String description,
+                                                String instructions, Level level,
+                                                short coreQuestionCount, short maxFollowUpsTotal,
+                                                short maxFollowUpsPerParent,
+                                                short targetDurationMin, short hardDurationMin,
+                                                UUID createdBy, OffsetDateTime now) {
+        InterviewTemplateEntity entity = new InterviewTemplateEntity();
+        entity.id = id;
+        entity.templateKey = templateKey;
+        entity.version = version;
+        entity.title = title;
+        entity.summary = summary;
+        entity.description = description;
+        entity.instructions = instructions;
+        entity.level = level == null ? Level.MID : level;
+        entity.status = Status.DRAFT;
+        entity.coreQuestionCount = coreQuestionCount;
+        entity.maxFollowUpsTotal = maxFollowUpsTotal;
+        entity.maxFollowUpsPerParent = maxFollowUpsPerParent;
+        entity.targetDurationMin = targetDurationMin;
+        entity.hardDurationMin = hardDurationMin;
+        entity.createdBy = createdBy;
+        entity.createdAt = now;
+        entity.updatedAt = now;
+        return entity;
+    }
+
+    /** Edits the draft. Rejected by {@code trg_tpl_20_guard} once published. */
+    public void updateDraft(String title, String summary, String description,
+                            String instructions, Level level, Short coreQuestionCount,
+                            Short maxFollowUpsTotal, Short maxFollowUpsPerParent,
+                            Short targetDurationMin, Short hardDurationMin,
+                            OffsetDateTime now) {
+        this.title = title != null ? title : this.title;
+        this.summary = summary;
+        this.description = description;
+        this.instructions = instructions;
+        this.level = level != null ? level : this.level;
+        if (coreQuestionCount != null) {
+            this.coreQuestionCount = coreQuestionCount;
+        }
+        if (maxFollowUpsTotal != null) {
+            this.maxFollowUpsTotal = maxFollowUpsTotal;
+        }
+        if (maxFollowUpsPerParent != null) {
+            this.maxFollowUpsPerParent = maxFollowUpsPerParent;
+        }
+        if (targetDurationMin != null) {
+            this.targetDurationMin = targetDurationMin;
+        }
+        if (hardDurationMin != null) {
+            this.hardDurationMin = hardDurationMin;
+        }
+        this.updatedAt = now;
+    }
+
+    /**
+     * Freezes the template.
+     *
+     * <p>Every attempt that pins this row keeps its configuration and its skill
+     * weights unchanged, which is what makes scores from different weeks
+     * comparable at all.
+     */
+    public void publish(UUID publishedBy, OffsetDateTime now) {
+        this.status = Status.PUBLISHED;
+        this.publishedAt = now;
+        this.publishedBy = publishedBy;
+        this.updatedAt = now;
+    }
+
+    public void archive(UUID archivedBy, OffsetDateTime now) {
+        this.status = Status.ARCHIVED;
+        this.archivedAt = now;
+        this.archivedBy = archivedBy;
+        this.updatedAt = now;
+    }
+
+    public boolean isDraft() {
+        return status == Status.DRAFT;
+    }
+
+    public boolean isPublished() {
+        return status == Status.PUBLISHED;
+    }
+
     public UUID getId() { return id; }
     public String getTemplateKey() { return templateKey; }
     public Integer getVersion() { return version; }

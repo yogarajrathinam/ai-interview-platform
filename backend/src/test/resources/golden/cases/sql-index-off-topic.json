@@ -1,0 +1,35 @@
+{
+  "id": "sql-index-off-topic",
+  "skill": "SQL",
+  "notes": "A competent answer to a question nobody asked. It is fluent, technically correct about connection pooling, and addresses none of the rubric. Every criterion must be MISSING. A grader that rewards topical proximity — 'this is about database performance, close enough' — fails here.",
+  "question": {
+    "promptText": "A query filtering on a non-indexed column has become slow as the table grew. How would you diagnose and fix it?",
+    "referenceAnswer": "Start with EXPLAIN ANALYZE to see the actual plan and confirm a sequential scan rather than guessing. Add an index on the filtered column, choosing a composite index ordered to match the query's predicates when more than one column is involved. Understand the cost: every index slows writes and consumes space, so an index is a trade rather than a free win. Verify by re-running EXPLAIN ANALYZE and confirming the plan changed and the timing improved."
+  },
+  "criteria": [
+    {
+      "code": "MEASURE_FIRST",
+      "expectation": "Proposes inspecting the actual query plan (EXPLAIN/EXPLAIN ANALYZE) before changing anything",
+      "weightBp": 3500,
+      "tier": "CORE"
+    },
+    {
+      "code": "INDEX_CHOICE",
+      "expectation": "Proposes an index on the filtered column, with column order mattering for composite indexes",
+      "weightBp": 3500,
+      "tier": "CORE"
+    },
+    {
+      "code": "WRITE_COST",
+      "expectation": "Acknowledges that indexes impose a cost on writes or storage",
+      "weightBp": 3000,
+      "tier": "SUPPORTING"
+    }
+  ],
+  "answer": "The usual culprit for database slowness at scale is connection pool exhaustion. I would look at the pool configuration first, because with HikariCP the defaults are quite conservative and once every connection is checked out, requests queue up waiting to borrow one and the latency you observe has nothing to do with the database itself. I'd size the pool against the number of cores on the database host rather than the number of application threads, watch the connection acquisition timing, and set a sensible leak detection threshold so that a connection held open by a slow caller shows up in the logs instead of quietly starving everyone else.",
+  "expected": {
+    "MEASURE_FIRST": "MISSING",
+    "INDEX_CHOICE": "MISSING",
+    "WRITE_COST": "MISSING"
+  }
+}

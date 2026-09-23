@@ -1,0 +1,35 @@
+{
+  "id": "java-hashmap-strong",
+  "skill": "JAVA",
+  "notes": "Clear-cut baseline. Every criterion is asserted explicitly and quotably. If the grader cannot get this case right, nothing else in the set is worth reading.",
+  "question": {
+    "promptText": "What is the difference between HashMap and ConcurrentHashMap, and when would you choose each?",
+    "referenceAnswer": "HashMap is not thread-safe; concurrent structural modification can corrupt it or cause an infinite loop during resize. ConcurrentHashMap is thread-safe and uses per-bin locking (CAS plus synchronized on the first node) rather than locking the whole map, so concurrent reads are lock-free. ConcurrentHashMap forbids null keys and values because null is ambiguous with 'absent' under concurrency. Use HashMap when the map is confined to one thread or externally synchronised; use ConcurrentHashMap for shared mutable state."
+  },
+  "criteria": [
+    {
+      "code": "THREAD_SAFETY",
+      "expectation": "States that HashMap is not thread-safe while ConcurrentHashMap is",
+      "weightBp": 4000,
+      "tier": "CORE"
+    },
+    {
+      "code": "LOCK_GRANULARITY",
+      "expectation": "Explains that ConcurrentHashMap locks per bin or segment rather than the whole map",
+      "weightBp": 3000,
+      "tier": "CORE"
+    },
+    {
+      "code": "NULL_HANDLING",
+      "expectation": "States that ConcurrentHashMap forbids null keys and values",
+      "weightBp": 3000,
+      "tier": "SUPPORTING"
+    }
+  ],
+  "answer": "HashMap is not thread-safe. If two threads write to it at the same time you can corrupt the internal table, and historically a concurrent resize could spin forever. ConcurrentHashMap is safe for concurrent use. The important part is that it does not take a single global lock: it locks per bin, using a CAS to install the first node and synchronizing on that node's head when there is already a chain there, so writes to different buckets do not block each other and reads are essentially lock-free. One thing that catches people out is that ConcurrentHashMap does not allow null keys or null values, because under concurrency you could not tell whether get returned null for 'no mapping' or for 'mapped to null'. I would use a plain HashMap for a map confined to one thread, and ConcurrentHashMap for shared mutable state.",
+  "expected": {
+    "THREAD_SAFETY": "MET",
+    "LOCK_GRANULARITY": "MET",
+    "NULL_HANDLING": "MET"
+  }
+}

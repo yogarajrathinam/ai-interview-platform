@@ -8,6 +8,13 @@ spring:
   jpa:
     show-sql: true
 
+app:
+  # Publishes a realistic interview into an empty local database so the
+  # candidate UI has something to run against. Off everywhere else, and a
+  # no-op once the template exists.
+  dev-seed:
+    enabled: ${APP_DEV_SEED:true}
+
 logging:
   level:
     com.aiinterview.interviewplatform: DEBUG

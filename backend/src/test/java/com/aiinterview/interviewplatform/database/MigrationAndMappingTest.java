@@ -64,8 +64,14 @@ class MigrationAndMappingTest extends AbstractDatabaseTest {
     @Test
     @DisplayName("V2 seeds the three Phase 0 skills")
     void seedSkillsApplied() {
-        List<String> codes = jdbc.queryForList(
-                "SELECT code FROM app.skills ORDER BY sort_order", String.class);
+        // Scoped to the seeded codes rather than asserting the table's whole
+        // contents: other suites legitimately add skills of their own, and this
+        // test is about what the migration put there, not what nobody else did.
+        List<String> codes = jdbc.queryForList("""
+                SELECT code FROM app.skills
+                 WHERE code IN ('JAVA', 'SPRING_BOOT', 'SQL')
+                 ORDER BY sort_order
+                """, String.class);
         assertThat(codes).containsExactly("JAVA", "SPRING_BOOT", "SQL");
     }
 

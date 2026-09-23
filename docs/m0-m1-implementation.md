@@ -189,8 +189,10 @@ foreign key exists.
    `postgres:16-alpine` to match Supabase. Nothing used here is version-specific
    (partial indexes, `num_nonnulls`, plpgsql, `SKIP LOCKED` are all long
    established), but the 16 run is still outstanding.
-3. **No CI pipeline yet.** The build is CI-ready — `mvn clean verify` is the
-   whole gate — but no workflow file exists. It needs a runner with Docker.
+3. ~~No CI pipeline yet.~~ **Resolved** — `.github/workflows/ci.yml` added
+   (see README § Continuous integration). It closes limitations 1 and 2 above on
+   the first run: the GitHub runner has Docker, so the Testcontainers path is
+   exercised and the suite runs against the pinned `postgres:16-alpine`.
 4. **`admin` contains only a `package-info`.** Intentional: its read models
    arrive in M9.
 5. **No repositories, services, controllers or DTOs.** Intentional: JPA exists

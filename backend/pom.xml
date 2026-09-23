@@ -23,6 +23,10 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <archunit.version>1.3.0</archunit.version>
     <uuid-generator.version>5.1.0</uuid-generator.version>
+    <anthropic-sdk.version>2.34.0</anthropic-sdk.version>
+    <wiremock.version>3.9.2</wiremock.version>
+    <!-- Empty by default so surefire runs every non-excluded group. -->
+    <surefire.groups></surefire.groups>
   </properties>
 
   <dependencies>
@@ -73,6 +77,17 @@
       <version>${uuid-generator.version}</version>
     </dependency>
 
+    <!--
+      Anthropic SDK. Reachable ONLY from evaluation.infrastructure.anthropic —
+      an ArchUnit rule fails the build if a vendor type escapes an
+      infrastructure package, which is what keeps the provider replaceable.
+    -->
+    <dependency>
+      <groupId>com.anthropic</groupId>
+      <artifactId>anthropic-java</artifactId>
+      <version>${anthropic-sdk.version}</version>
+    </dependency>
+
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-configuration-processor</artifactId>
@@ -106,6 +121,16 @@
       <version>${archunit.version}</version>
       <scope>test</scope>
     </dependency>
+    <!--
+      Serves canned HTTP responses so the real adapter is exercised over real
+      HTTP without a live API. CI must never depend on a paid provider.
+    -->
+    <dependency>
+      <groupId>org.wiremock</groupId>
+      <artifactId>wiremock-standalone</artifactId>
+      <version>${wiremock.version}</version>
+      <scope>test</scope>
+    </dependency>
   </dependencies>
 
   <build>
@@ -119,8 +144,10 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
           <!-- Database-backed tests are tagged and excluded when no
-               container runtime is available: -DexcludedGroups=database -->
+               container runtime is available: -DexcludedGroups=database.
+               live-ai is excluded by every profile except -Plive-ai. -->
           <excludedGroups>${surefire.excludedGroups}</excludedGroups>
+          <groups>${surefire.groups}</groups>
         </configuration>
       </plugin>
     </plugins>
@@ -131,12 +158,26 @@
       <!-- Default: run everything, including Testcontainers. -->
       <id>all-tests</id>
       <activation><activeByDefault>true</activeByDefault></activation>
-      <properties><surefire.excludedGroups></surefire.excludedGroups></properties>
+      <properties><surefire.excludedGroups>live-ai</surefire.excludedGroups></properties>
     </profile>
     <profile>
       <!-- mvn test -Pno-docker  — architecture and unit tests only. -->
       <id>no-docker</id>
-      <properties><surefire.excludedGroups>database</surefire.excludedGroups></properties>
+      <properties><surefire.excludedGroups>database,live-ai</surefire.excludedGroups></properties>
+    </profile>
+    <profile>
+      <!--
+        mvn test -Plive-ai -Dtest=GoldenSetLiveEvaluationTest
+
+        Runs the golden set against the REAL provider. Opt-in only: it spends
+        money and needs ANTHROPIC_API_KEY, so it is excluded from every other
+        profile including the default. Nothing here runs during `mvn verify`.
+      -->
+      <id>live-ai</id>
+      <properties>
+        <surefire.excludedGroups></surefire.excludedGroups>
+        <surefire.groups>live-ai</surefire.groups>
+      </properties>
     </profile>
   </profiles>
 </project>

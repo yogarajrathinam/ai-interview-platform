@@ -1,5 +1,6 @@
 package com.aiinterview.interviewplatform.evaluation.domain;
 
+import com.aiinterview.interviewplatform.evaluation.api.Verdict;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -39,8 +40,6 @@ public class EvaluationCriterionResultEntity {
      * false is worse than omitting it, and the two deserve different credit
      * and very different feedback.
      */
-    public enum Verdict { MET, PARTIAL, MISSING, CONTRADICTED }
-
     @Id
     @Column(name = "id", nullable = false, updatable = false)
     private UUID id;
@@ -85,6 +84,46 @@ public class EvaluationCriterionResultEntity {
 
     protected EvaluationCriterionResultEntity() {
         // for JPA
+    }
+
+    /**
+     * Creates one criterion result.
+     *
+     * <p>{@code weightBp} and {@code credit} are copied in rather than looked up
+     * later: that is what lets a historical report's arithmetic be recomputed
+     * from this row alone, even after the rubric or the scoring policy changes.
+     *
+     * <p>Evidence offsets must already have been computed and verified against
+     * the answer text. Both are null or both are set — never one.
+     */
+    public static EvaluationCriterionResultEntity create(
+            UUID id, UUID evaluationId, UUID rubricCriterionId, Verdict verdict,
+            BigDecimal credit, int weightBp, BigDecimal confidence, String evidenceQuote,
+            Integer evidenceStart, Integer evidenceEnd, boolean evidenceRejected,
+            String comment) {
+
+        if ((evidenceStart == null) != (evidenceEnd == null)) {
+            throw new IllegalArgumentException(
+                    "evidence offsets must both be present or both absent");
+        }
+        if (evidenceStart != null && evidenceEnd <= evidenceStart) {
+            throw new IllegalArgumentException("evidence end must be after start");
+        }
+
+        EvaluationCriterionResultEntity entity = new EvaluationCriterionResultEntity();
+        entity.id = id;
+        entity.evaluationId = evaluationId;
+        entity.rubricCriterionId = rubricCriterionId;
+        entity.verdict = verdict;
+        entity.credit = credit;
+        entity.weightBp = weightBp;
+        entity.confidence = confidence;
+        entity.evidenceQuote = evidenceQuote;
+        entity.evidenceStart = evidenceStart;
+        entity.evidenceEnd = evidenceEnd;
+        entity.evidenceRejected = evidenceRejected;
+        entity.comment = comment;
+        return entity;
     }
 
     public UUID getId() { return id; }

@@ -37,6 +37,22 @@ public class TemplateSkillEntity {
         // for JPA
     }
 
+    /**
+     * Weights one skill within a template.
+     *
+     * <p>Basis points, and the set must sum to exactly 10000 before the
+     * template can publish — {@code trg_tpl_10_validate} checks it, and the
+     * authoring service checks it first so the author is told which way the
+     * total is wrong.
+     */
+    public static TemplateSkillEntity create(UUID templateId, UUID skillId, int weightBp) {
+        TemplateSkillEntity entity = new TemplateSkillEntity();
+        entity.templateId = templateId;
+        entity.skillId = skillId;
+        entity.weightBp = weightBp;
+        return entity;
+    }
+
     public UUID getTemplateId() { return templateId; }
     public UUID getSkillId() { return skillId; }
     public Integer getWeightBp() { return weightBp; }

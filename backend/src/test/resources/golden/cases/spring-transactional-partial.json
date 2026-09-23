@@ -1,0 +1,35 @@
+{
+  "id": "spring-transactional-partial",
+  "skill": "SPRING_BOOT",
+  "notes": "A genuinely good answer that is incomplete rather than wrong. SELF_INVOCATION is explained precisely and is MET. PROXY_MECHANISM is alluded to ('Spring wraps the bean') without naming proxying as the mechanism, which is the textbook PARTIAL. ROLLBACK_RULES is absent. Guards against a grader that treats a strong overall impression as coverage of every criterion.",
+  "question": {
+    "promptText": "How does Spring's @Transactional annotation work, and what are its common pitfalls?",
+    "referenceAnswer": "@Transactional is implemented with AOP proxies: Spring wraps the bean in a proxy that opens a transaction before the method and commits or rolls back after. Because the proxy is only involved on external calls, a self-invocation from one method of the bean to another bypasses it entirely and the annotation has no effect. By default Spring rolls back on unchecked exceptions and errors but commits on checked exceptions, which surprises people; rollbackFor overrides this."
+  },
+  "criteria": [
+    {
+      "code": "PROXY_MECHANISM",
+      "expectation": "Identifies that @Transactional works through an AOP proxy around the bean",
+      "weightBp": 3500,
+      "tier": "CORE"
+    },
+    {
+      "code": "SELF_INVOCATION",
+      "expectation": "Explains that a self-invocation bypasses the proxy so the annotation has no effect",
+      "weightBp": 3500,
+      "tier": "CORE"
+    },
+    {
+      "code": "ROLLBACK_RULES",
+      "expectation": "States that rollback happens by default on unchecked exceptions but not checked ones",
+      "weightBp": 3000,
+      "tier": "SUPPORTING"
+    }
+  ],
+  "answer": "When you annotate a method with @Transactional, Spring wraps the bean so that the transaction is started before your method body runs and committed once it returns. The pitfall that bites almost everyone at least once is calling an annotated method from another method in the same class. Because the call goes straight to this rather than through the wrapper, none of the transactional behaviour applies and you get no transaction at all, silently. The fix is to move the annotated method into a separate bean and inject it, so the call goes through the wrapper the way it is supposed to.",
+  "expected": {
+    "PROXY_MECHANISM": "PARTIAL",
+    "SELF_INVOCATION": "MET",
+    "ROLLBACK_RULES": "MISSING"
+  }
+}

@@ -109,6 +109,46 @@ public class AiInvocationEntity {
         // for JPA
     }
 
+    /**
+     * Creates a row for one completed call attempt.
+     *
+     * <p>Package-private construction is deliberate: invocations are written by
+     * the ai module's recorder and nowhere else, so the table cannot drift out
+     * of step with the port that owns it. Token and cost arguments must be null
+     * when not genuinely known — zeros would corrupt the unit-economics figures
+     * this table exists to answer.
+     */
+    public static AiInvocationEntity create(
+            UUID id, Purpose purpose, String provider, String model, String promptVersion,
+            String requestFingerprint, Status status, Short httpStatus, Integer latencyMs,
+            Integer inputTokens, Integer outputTokens, Long costMicros, short retryIndex,
+            String rawResponse, String errorDetail, UUID interviewId, UUID answerId,
+            UUID userId, String traceId, OffsetDateTime createdAt) {
+
+        AiInvocationEntity entity = new AiInvocationEntity();
+        entity.id = id;
+        entity.purpose = purpose;
+        entity.provider = provider;
+        entity.model = model;
+        entity.promptVersion = promptVersion;
+        entity.requestFingerprint = requestFingerprint;
+        entity.status = status;
+        entity.httpStatus = httpStatus;
+        entity.latencyMs = latencyMs;
+        entity.inputTokens = inputTokens;
+        entity.outputTokens = outputTokens;
+        entity.costMicros = costMicros;
+        entity.retryIndex = retryIndex;
+        entity.rawResponse = rawResponse;
+        entity.errorDetail = errorDetail;
+        entity.interviewId = interviewId;
+        entity.answerId = answerId;
+        entity.userId = userId;
+        entity.traceId = traceId;
+        entity.createdAt = createdAt;
+        return entity;
+    }
+
     public UUID getId() { return id; }
     public Purpose getPurpose() { return purpose; }
     public String getProvider() { return provider; }

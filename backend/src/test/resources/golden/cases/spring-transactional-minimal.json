@@ -1,0 +1,35 @@
+{
+  "id": "spring-transactional-minimal",
+  "skill": "SPRING_BOOT",
+  "notes": "A near-empty answer. One true but trivial sentence that restates the annotation's purpose without addressing any criterion. All three MISSING. The floor case: a grader that finds partial credit here is giving marks for showing up, which would distort every score in the system upward.",
+  "question": {
+    "promptText": "How does Spring's @Transactional annotation work, and what are its common pitfalls?",
+    "referenceAnswer": "@Transactional is implemented with AOP proxies: Spring wraps the bean in a proxy that opens a transaction before the method and commits or rolls back after. Because the proxy is only involved on external calls, a self-invocation from one method of the bean to another bypasses it entirely and the annotation has no effect. By default Spring rolls back on unchecked exceptions and errors but commits on checked exceptions, which surprises people; rollbackFor overrides this."
+  },
+  "criteria": [
+    {
+      "code": "PROXY_MECHANISM",
+      "expectation": "Identifies that @Transactional works through an AOP proxy around the bean",
+      "weightBp": 3500,
+      "tier": "CORE"
+    },
+    {
+      "code": "SELF_INVOCATION",
+      "expectation": "Explains that a self-invocation bypasses the proxy so the annotation has no effect",
+      "weightBp": 3500,
+      "tier": "CORE"
+    },
+    {
+      "code": "ROLLBACK_RULES",
+      "expectation": "States that rollback happens by default on unchecked exceptions but not checked ones",
+      "weightBp": 3000,
+      "tier": "SUPPORTING"
+    }
+  ],
+  "answer": "You put @Transactional on a service method and it makes the method run in a transaction, so everything in it either succeeds together or fails together. I have used it on save methods.",
+  "expected": {
+    "PROXY_MECHANISM": "MISSING",
+    "SELF_INVOCATION": "MISSING",
+    "ROLLBACK_RULES": "MISSING"
+  }
+}

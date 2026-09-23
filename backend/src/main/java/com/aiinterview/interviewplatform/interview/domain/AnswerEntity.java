@@ -51,6 +51,24 @@ public class AnswerEntity {
         // for JPA
     }
 
+    /**
+     * Records the candidate's work for one turn.
+     *
+     * <p>There is no update path, by design and by trigger: an answer is
+     * written once and never revised. Everything downstream depends on that —
+     * a failed evaluation cannot lose it, and a re-grade reads exactly what
+     * was graded the first time.
+     */
+    public static AnswerEntity create(UUID interviewQuestionId, String contentText,
+                                      InputMode inputMode, OffsetDateTime submittedAt) {
+        AnswerEntity entity = new AnswerEntity();
+        entity.interviewQuestionId = interviewQuestionId;
+        entity.contentText = contentText;
+        entity.inputMode = inputMode == null ? InputMode.TEXT : inputMode;
+        entity.submittedAt = submittedAt;
+        return entity;
+    }
+
     public UUID getInterviewQuestionId() { return interviewQuestionId; }
     public String getContentText() { return contentText; }
     public InputMode getInputMode() { return inputMode; }

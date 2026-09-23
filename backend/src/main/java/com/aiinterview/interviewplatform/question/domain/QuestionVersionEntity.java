@@ -95,6 +95,85 @@ public class QuestionVersionEntity {
         // for JPA
     }
 
+    /** A new editable version. Content may be incomplete until publish. */
+    public static QuestionVersionEntity draft(UUID id, UUID questionId, int version,
+                                              UUID skillId, QuestionType questionType,
+                                              Difficulty difficulty, String promptText,
+                                              String contextText, String referenceAnswer,
+                                              int expectedDurationSec, UUID createdBy,
+                                              OffsetDateTime now) {
+        QuestionVersionEntity entity = new QuestionVersionEntity();
+        entity.id = id;
+        entity.questionId = questionId;
+        entity.version = version;
+        entity.skillId = skillId;
+        entity.questionType = questionType;
+        entity.difficulty = difficulty;
+        entity.promptText = promptText;
+        entity.contextText = contextText;
+        entity.referenceAnswer = referenceAnswer;
+        entity.expectedDurationSec = expectedDurationSec;
+        entity.status = Status.DRAFT;
+        entity.createdBy = createdBy;
+        entity.createdAt = now;
+        entity.updatedAt = now;
+        return entity;
+    }
+
+    /**
+     * Edits the draft.
+     *
+     * <p>Callers must check {@link #isDraft()} first. The database trigger
+     * {@code trg_qv_20_guard} rejects a published edit regardless, but a domain
+     * error explaining that version N+1 is the way forward is far more useful
+     * than a constraint violation surfacing from three layers down.
+     */
+    public void updateDraft(UUID skillId, QuestionType questionType, Difficulty difficulty,
+                            String promptText, String contextText, String referenceAnswer,
+                            Integer expectedDurationSec, OffsetDateTime now) {
+        this.skillId = skillId != null ? skillId : this.skillId;
+        this.questionType = questionType != null ? questionType : this.questionType;
+        this.difficulty = difficulty != null ? difficulty : this.difficulty;
+        this.promptText = promptText != null ? promptText : this.promptText;
+        // Nullable fields are replaced wholesale: passing null must be able to
+        // clear optional content, not silently keep the previous value.
+        this.contextText = contextText;
+        this.referenceAnswer = referenceAnswer != null ? referenceAnswer : this.referenceAnswer;
+        if (expectedDurationSec != null) {
+            this.expectedDurationSec = expectedDurationSec;
+        }
+        this.updatedAt = now;
+    }
+
+    /**
+     * Freezes this version.
+     *
+     * <p>From here the content is immutable, and every interview that pins it
+     * will grade against exactly these words for as long as the row exists.
+     */
+    public void publish(UUID publishedBy, OffsetDateTime now) {
+        this.status = Status.PUBLISHED;
+        this.publishedAt = now;
+        this.publishedBy = publishedBy;
+        this.updatedAt = now;
+    }
+
+    /** Hides the version from new interviews; existing ones are untouched. */
+    public void archive(UUID archivedBy, OffsetDateTime now) {
+        this.status = Status.ARCHIVED;
+        this.archivedAt = now;
+        this.archivedBy = archivedBy;
+        this.updatedAt = now;
+    }
+
+    public boolean isDraft() {
+        return status == Status.DRAFT;
+    }
+
+    public boolean isPublished() {
+        return status == Status.PUBLISHED;
+    }
+
     public UUID getId() { return id; }
     public UUID getQuestionId() { return questionId; }
     public Integer getVersion() { return version; }

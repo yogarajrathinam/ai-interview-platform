@@ -47,6 +47,25 @@ public class QuestionEntity {
         // for JPA
     }
 
+    /** A new question family. Content lives on its versions, never here. */
+    public static QuestionEntity create(UUID id, String questionKey, UUID createdBy,
+                                        OffsetDateTime now) {
+        QuestionEntity entity = new QuestionEntity();
+        entity.id = id;
+        entity.questionKey = questionKey;
+        entity.status = Status.ACTIVE;
+        entity.createdBy = createdBy;
+        entity.createdAt = now;
+        entity.updatedAt = now;
+        return entity;
+    }
+
+    /** Retires the family. Published versions stay readable to existing attempts. */
+    public void archive(OffsetDateTime now) {
+        this.status = Status.ARCHIVED;
+        this.updatedAt = now;
+    }
+
     public UUID getId() { return id; }
     public String getQuestionKey() { return questionKey; }
     public Status getStatus() { return status; }

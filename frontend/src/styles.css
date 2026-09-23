@@ -1,0 +1,264 @@
+/*
+ * Plain CSS with tokens on :root.
+ *
+ * No framework: the repository had no frontend and therefore no component
+ * library to reuse, and adding one for six screens would be a dependency the
+ * project has to live with long after this vertical slice is replaced. When a
+ * design system arrives it can define these same tokens.
+ */
+
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --text: #17191c;
+  --muted: #5c636e;
+  --border: #dfe3e8;
+  --accent: #1f5fd8;
+  --accent-text: #ffffff;
+  --met: #1a7f4b;
+  --partial: #a4690a;
+  --missing: #6b7280;
+  --contradicted: #b3261e;
+  --radius: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #14161a;
+    --surface: #1c1f24;
+    --text: #eceef1;
+    --muted: #9aa2ae;
+    --border: #2c3138;
+    --accent: #5b8def;
+    --accent-text: #0d1014;
+    --met: #4ade80;
+    --partial: #fbbf24;
+    --missing: #9aa2ae;
+    --contradicted: #f87171;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.55;
+}
+
+.app {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1.75rem;
+}
+
+.card.centred {
+  text-align: center;
+}
+
+.card.error {
+  border-color: var(--contradicted);
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin: 0 0 0.75rem;
+}
+
+h2 {
+  font-size: 1.2rem;
+  margin: 1.5rem 0 0.5rem;
+}
+
+h3 {
+  font-size: 1rem;
+  margin: 1.25rem 0 0.25rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 0.875rem;
+}
+
+.badge {
+  display: inline-block;
+  font-size: 0.8rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+}
+
+textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+
+textarea:disabled {
+  opacity: 0.6;
+}
+
+.actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 1rem;
+}
+
+button {
+  font: inherit;
+  border-radius: var(--radius);
+  padding: 0.6rem 1.1rem;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--accent-text);
+}
+
+.secondary {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+}
+
+.score-block {
+  text-align: center;
+  padding: 1.5rem 0;
+}
+
+.score {
+  font-size: 3rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.skills {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.skills li {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.criteria {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.criteria > li {
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.verdict {
+  margin: 0;
+  font-weight: 600;
+}
+
+.verdict-met {
+  color: var(--met);
+}
+
+.verdict-partial {
+  color: var(--partial);
+}
+
+.verdict-missing {
+  color: var(--missing);
+}
+
+.verdict-contradicted {
+  color: var(--contradicted);
+}
+
+.criterion-name {
+  font-weight: 400;
+  color: var(--text);
+}
+
+blockquote {
+  margin: 0.5rem 0 0;
+  padding-left: 0.85rem;
+  border-left: 3px solid var(--border);
+}
+
+blockquote p {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+blockquote q {
+  color: var(--text);
+  font-size: 0.925rem;
+}
+
+.spinner {
+  width: 2rem;
+  height: 2rem;
+  margin: 1rem auto;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation-duration: 3s;
+  }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.85em;
+}

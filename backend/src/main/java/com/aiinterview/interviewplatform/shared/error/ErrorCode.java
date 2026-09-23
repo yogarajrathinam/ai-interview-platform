@@ -25,6 +25,14 @@ public enum ErrorCode {
     /** Also returned when a resource exists but belongs to someone else. */
     NOT_FOUND(HttpStatus.NOT_FOUND, "Not found"),
 
+    /**
+     * A state conflict with no more specific code — a duplicate key, or an
+     * operation whose precondition is not met. Added in M4 for catalogue
+     * authoring; prefer a specific code where one exists, because a client can
+     * act on {@code VERSION_IMMUTABLE} and can only report this one.
+     */
+    CONFLICT(HttpStatus.CONFLICT, "Conflicting state"),
+
     INTERVIEW_NOT_IN_PROGRESS(HttpStatus.CONFLICT, "Interview is not in progress"),
     LIVE_ATTEMPT_EXISTS(HttpStatus.CONFLICT, "A live interview attempt already exists"),
     VERSION_IMMUTABLE(HttpStatus.CONFLICT, "Published versions are immutable"),

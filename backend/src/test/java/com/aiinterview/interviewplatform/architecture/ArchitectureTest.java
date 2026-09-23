@@ -60,13 +60,98 @@ class ArchitectureTest {
                     .because("the domain must not know how it is persisted or transported")
                     .allowEmptyShould(true);
 
+    /**
+     * Refined in M2. The original form forbade {@code domain -> api} outright,
+     * which conflicted with a boundary that matters more: a module's published
+     * value types must live in its {@code api} package, or consumers of the
+     * contract are forced to import {@code <module>.domain} and break
+     * {@link #modules_talk_only_through_published_api}.
+     *
+     * <p>So {@code Verdict} and {@code EvaluationStatus} live in
+     * {@code evaluation.api} and the scorer depends on them. What the rule was
+     * really protecting — the domain staying free of the transport layer — is
+     * now stated directly, and is stricter for it: controllers and web types
+     * are named explicitly rather than inferred from a package name.
+     */
     @ArchTest
-    static final ArchRule domain_does_not_depend_on_api =
+    static final ArchRule domain_does_not_depend_on_the_transport_layer =
             noClasses()
                     .that().resideInAPackage("..domain..")
-                    .should().dependOnClassesThat().resideInAPackage("..api..")
-                    .because("dependencies point inward, never out to the transport layer")
+                    .should().dependOnClassesThat().haveSimpleNameEndingWith("Controller")
+                    .orShould().dependOnClassesThat()
+                        .resideInAnyPackage("org.springframework.web..",
+                                            "jakarta.servlet..")
+                    .because("the domain must not know it is reachable over HTTP")
                     .allowEmptyShould(true);
+
+    /**
+     * The evaluation engine is handed an answer, a question version and a
+     * rubric — it does not know what an interview is. That is what lets the
+     * same engine serve the admin rubric dry-run, where no interview, no turn
+     * and no stored answer exist.
+     */
+    @ArchTest
+    static final ArchRule evaluation_does_not_depend_on_the_interview_module =
+            noClasses()
+                    .that().resideInAPackage(ROOT + ".evaluation..")
+                    .should().dependOnClassesThat().resideInAPackage(ROOT + ".interview..")
+                    .because("grading must stay usable without an interview")
+                    .allowEmptyShould(true);
+
+    /**
+     * Tripwire for the milestone that adds a real provider. Vendor SDK types
+     * must not escape an infrastructure package: the moment one appears in a
+     * service or a domain type, swapping providers stops being a config change.
+     */
+    @ArchTest
+    static final ArchRule provider_sdks_stay_in_infrastructure =
+            noClasses()
+                    .that().resideOutsideOfPackage("..infrastructure..")
+                    .should().dependOnClassesThat().resideInAnyPackage(
+                            "com.openai..", "com.anthropic..", "com.google.genai..",
+                            "dev.langchain4j..", "com.theokanning..")
+                    .because("the AI vendor must be reachable only behind EvaluationProvider")
+                    .allowEmptyShould(true);
+
+    /**
+     * Tighter than the rule above, and the one that does the real work now that
+     * a vendor SDK is actually on the classpath.
+     *
+     * <p>"Somewhere in infrastructure" is too generous: it would let a vendor
+     * type leak into the job worker or a repository, and replacing the provider
+     * would stop being a local change. Confining the SDK to the single adapter
+     * package is what keeps {@code EvaluationProvider} a genuine port rather
+     * than a decorative interface — swapping vendors means writing one new
+     * package and changing one property.
+     */
+    @ArchTest
+    static final ArchRule vendor_sdk_is_confined_to_its_adapter_package =
+            noClasses()
+                    .that().resideOutsideOfPackage("..evaluation.infrastructure.anthropic..")
+                    .should().dependOnClassesThat().resideInAnyPackage("com.anthropic..")
+                    .because("the whole point of the port is that only the adapter "
+                            + "knows which vendor is in use");
+
+    /**
+     * The vendor's wire shape must not escape the adapter.
+     *
+     * <p>{@code GradingResponse} is package-private for this reason, and this
+     * rule makes that a build failure rather than a convention: the moment
+     * another package can name it, the provider's output shape becomes part of
+     * our internal contract and the next vendor is a refactor rather than a
+     * new class.
+     */
+    @ArchTest
+    static final ArchRule evaluation_api_does_not_know_about_any_vendor =
+            noClasses()
+                    .that().resideInAPackage("..evaluation.api..")
+                    .or().resideInAPackage("..evaluation.domain..")
+                    .or().resideInAPackage("..evaluation.application..")
+                    .should().dependOnClassesThat()
+                    .resideInAnyPackage("..evaluation.infrastructure.anthropic..")
+                    .because("scoring and validation must be identical whichever "
+                            + "provider produced the verdicts, so nothing that "
+                            + "scores may name the adapter that produced them");
 
     @ArchTest
     static final ArchRule api_does_not_reach_into_infrastructure =
@@ -89,13 +174,55 @@ class ArchitectureTest {
     /**
      * Entities are persistence types. Exposing one over HTTP leaks the schema
      * into the public contract and drags lazy loading into serialization.
+     *
+     * <p>Matched by the {@code @Entity} annotation rather than by a name ending
+     * in "Entity". The original form was written before any controller existed
+     * and, the moment one did, flagged Spring's own {@code ResponseEntity} — a
+     * rule that fires on a naming coincidence teaches people to work around it
+     * rather than to obey it.
      */
     @ArchTest
     static final ArchRule entities_are_not_exposed_by_controllers =
             noClasses()
                     .that().haveSimpleNameEndingWith("Controller")
-                    .should().dependOnClassesThat().haveSimpleNameEndingWith("Entity")
+                    .should().dependOnClassesThat()
+                        .areAnnotatedWith(jakarta.persistence.Entity.class)
                     .because("controllers must return DTOs, never JPA entities")
+                    .allowEmptyShould(true);
+
+    /**
+     * Added in M5A, when the first controllers arrived.
+     *
+     * <p>A controller may reach a module only through its published {@code api}.
+     * The moment it can name an application service or a domain type directly,
+     * "thin controller" becomes a convention rather than a property — logic
+     * migrates upward one convenience at a time, and the HTTP layer quietly
+     * becomes the place business rules live.
+     */
+    @ArchTest
+    static final ArchRule controllers_call_only_published_contracts =
+            noClasses()
+                    .that().haveSimpleNameEndingWith("Controller")
+                    .should().dependOnClassesThat()
+                        .resideInAnyPackage("..application..", "..domain..")
+                    .because("a controller orchestrates through <module>.api and nothing else")
+                    .allowEmptyShould(true);
+
+    /**
+     * The score is computed in one place and shown in another.
+     *
+     * <p>A controller that could reach the scorer could also round it, weight it
+     * or renormalise it "just for display", and the number a candidate sees
+     * would stop being the number the system stored. The HTTP layer transports
+     * a score; it never participates in producing one.
+     */
+    @ArchTest
+    static final ArchRule controllers_do_not_compute_scores =
+            noClasses()
+                    .that().haveSimpleNameEndingWith("Controller")
+                    .should().dependOnClassesThat().haveSimpleNameEndingWith("Scorer")
+                    .orShould().dependOnClassesThat().haveSimpleNameEndingWith("ScoringPolicy")
+                    .because("scoring belongs to the evaluation domain, not to transport")
                     .allowEmptyShould(true);
 
     // -------------------------------------------------------- domain purity
